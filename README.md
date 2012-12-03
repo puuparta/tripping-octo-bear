@@ -1,4 +1,2 @@
 tripping-octo-bear
 ==================
-
-AutoBisect
