@@ -8,7 +8,9 @@
 #include <avr/io.h>
 #include <util/delay.h>
 
-// Porttiasetukset
+/************************************************************************/
+/* Porttiasetukset                                                      */
+/************************************************************************/
 // projektissa käytetään 4bittistä lcd interfacea. 
 // LCD:n dataväylä eli DB4-DB7 on kytketty ATmegan pinneihin PORTB0-PORTB3
 // RS on kytketty PORTB4, RW PORTB5, EN PORTB6
@@ -17,6 +19,14 @@
 #define EN 6
 #define RW 5
 #define RS 4
+
+/* MCU ohjelmointi on 80% datasheetien tulkintaa ja 20% kahvinjuontia.
+ * Komentojen sekä varsinaisen merkkidatan kirjoitus LCD:lle on 
+ * ohjelmoitu HD44780 datasheetin sivun 33 kuvan "Example of 4-Bit Data 
+ * Transfer Timing Sequence" mukaan. Kuvassa RS signaali on 1 eli 
+ * kirjoitetaan dataa. Komennon kirjoittamisessa RS on vastaavasti 0.
+ * HD44780 datasheet: http://www.sparkfun.com/datasheets/LCD/HD44780.pdf
+ */
 
 int main()
 {
@@ -52,21 +62,25 @@ int main()
 /************************************************************************/
 void lcd_init()
 {
-	// 4bit moodiin resetointi, HD44780 datasheet 
-	// http://www.sparkfun.com/datasheets/LCD/HD44780.pdf
-	// datasheet sivu 46: Figure 24, 4-Bit Interface
+	/* 4bit moodiin resetointi 
+	 * datasheet sivu 46: Figure 24, 4-Bit Interface
+	 * Resetointibitit voi lähettää myös yhtenä 4 bitin pakettina
+	 * kerrallaan mutta käytetään tässä samaa funktiota kuin
+	 * LCD:n asetusbiteissä. Lopputulos on sama.
+	 */
 	write_cmd(0x03);
 	write_cmd(0x03);
 	write_cmd(0x03);
 	write_cmd(0x02);
 		
-	// alustetaan halutuin konfiguroinnein
-	// datasheet sivu 42: Table 12 4-Bit Operation ja sivu 24 Instructions
-	write_cmd(0x02);
-	write_cmd(0x08);
-	write_cmd(0x01);
-	write_cmd(0x06);
-	write_cmd(0x0C);
+	/* LCD:n asetusbitit.
+	 * datasheet sivu 42: Table 12 4-Bit Operation ja sivu 24 Instructions
+	 * 4bit moodissa vain DB7-DB4 on käytössä.
+	 */
+	write_cmd(0x20); // 4bit mode on annettava vielä kerran
+	write_cmd(0x0F); // näyttö päälle ja demon vuoksi kursori vilkkumaan.
+	write_cmd(0x06); // entry moodi: kirjoitus ja kursorisuunta oikealle 
+
 }
 
 /************************************************************************/
