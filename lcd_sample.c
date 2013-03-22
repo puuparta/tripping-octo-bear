@@ -7,6 +7,7 @@
 
 #include <avr/io.h>
 #include <util/delay.h>
+#include <stdlib.h>
 
 /************************************************************************/
 /* Porttiasetukset                                                      */
@@ -28,6 +29,18 @@
  * HD44780 datasheet: http://www.sparkfun.com/datasheets/LCD/HD44780.pdf
  */
 
+/* esitellään prototyypit, ettei tule void paluuarvoja missä ei pitäisi.
+ * avr-gcc pillastuu ilman näitä. 
+ */
+void lcd_init();
+void write_cmd(unsigned char cmd);
+void write_data(unsigned char data);
+void signal_e();
+void wait_bf();
+void write_string(char *str);
+void i2c_init2();
+unsigned char read_temp();
+
 int main()
 {
 	// portin suunnaksi lähtö, tuloa tarvitaan esim. kun kysytään 
@@ -36,6 +49,11 @@ int main()
 	
 	// alustetaan lcd
 	lcd_init();
+	
+	// alustetaan i2c väylä
+	i2c_init2();
+	
+	write_cmd(0x01); // näytön tyhjennys
 	
 	// kirjoitetaan "Lämpötila: 24 C"
 	write_data('L');
@@ -49,12 +67,27 @@ int main()
 	write_data('a');
 	write_data(':');
 	
-	char* lampotila_sensorilta ="24.7";
-	write_string(lampotila_sensorilta);
-	write_data(0b11011111); //aste-merkki
-	write_data('C');
-	
-	while(1);
+	while(1)
+	{
+		write_cmd(1<<7 | 10); // siirrytään positioon 11 ekalle riville
+		unsigned char lampotila_sensorilta = read_temp();
+		unsigned char buffer[7];
+		
+		// 0-127 = + alue ja 128-255 on - alue
+		if (lampotila_sensorilta > 127) {
+			write_data('-');
+			lampotila_sensorilta = 255-lampotila_sensorilta;
+		}
+		else 
+		{
+			write_data('+');
+		}
+		itoa(lampotila_sensorilta, buffer, 10);
+		write_string(buffer);
+		write_data(0b11011111); //aste-merkki
+		write_data('C');
+		_delay_ms(1000);
+	}
 }
 
 /************************************************************************/
@@ -78,8 +111,11 @@ void lcd_init()
 	 * 4bit moodissa vain DB7-DB4 on käytössä.
 	 */
 	write_cmd(0x20); // 4bit mode on annettava vielä kerran
-	write_cmd(0x0F); // näyttö päälle ja demon vuoksi kursori vilkkumaan.
-	write_cmd(0x06); // entry moodi: kirjoitus ja kursorisuunta oikealle 
+	write_cmd(0x0C); // näyttö päälle, kursori piiloon.
+	//demomode: 
+	//write_cmd(0x0F); // näyttö päälle ja demon vuoksi kursori vilkkumaan.
+	write_cmd(0x06); // entry moodi: kirjoitus ja kursorisuunta oikealle
+	write_cmd(0x01); // näytön tyhjennys
 
 }
 
@@ -149,5 +185,41 @@ void write_string(char *str)
 	{
 		write_data(*str++);
 	}
+}
+
+/************************************************************************/
+/* Alustetaan I2C-väylä                                                 */
+/************************************************************************/
+void i2c_init2()
+{
+	DDRD = DDRD & 0xfc; // scl & sda portit tuloiksi
+	PORTD |= (1<<PD1); // pull-up bit 1, SDA
+	PORTD |= (1<<PD0); // pull-up bit 0, SCL
+	TWSR = 0x00; //prescaler=1
+	TWBR = 0x04; // clockfreq = 2mhz/(16+2*4*4^1) = ~41,5khz	
+}
+
+/************************************************************************/
+/* luetaan i2c-väylältä TC74 lämpötila                                  */
+/* TC74 A3, 5.0V AT			                                            */
+// model: 11103GU                                                       */
+/************************************************************************/
+unsigned char read_temp()
+{
+	char vastaus;
+	TWCR = (1<<TWINT)|(1<<TWSTA)|(1<<TWEN);
+	while (!(TWCR & (1<<TWINT)));
+	
+	// TC74 osoite väylällä
+	TWDR = 0x97;
+	
+	TWCR = (1<<TWINT)|(1<<TWEN);
+	while (!(TWCR & (1<<TWINT)));
+	
+	TWCR = (1<<TWINT)|(1<<TWEN)|(1<<TWEA);
+	while (!(TWCR & (1<<TWINT)));
+	
+	vastaus = TWDR;
+	return vastaus;
 }
 
