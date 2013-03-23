@@ -69,16 +69,22 @@ int main()
 	
 	while(1)
 	{
-		write_cmd(1<<7 | 10); // siirrytään positioon 11 ekalle riville
+		write_cmd(1<<7 | 10); // siirrytään positioon 10 ekalle riville
 		unsigned char lampotila_sensorilta = read_temp();
 		unsigned char buffer[7];
+		unsigned char debug_buffer[7]; 
+		itoa(lampotila_sensorilta, debug_buffer, 10);
 		
-		// 0-127 = + alue ja 128-255 on - alue
+		/* TC74 datasheetin Taulukossa kuvataan lämpötilan digitalisointi
+		 * TABLE 4-4: TEMPERATURE-TO-DIGITAL VALUE CONVERSION 
+		 * -65...+130C
+		 * 0-127 = + alue ja 128-256 on - alue
+		 */
 		if (lampotila_sensorilta > 127) {
 			write_data('-');
-			lampotila_sensorilta = 255-lampotila_sensorilta;
+			lampotila_sensorilta = ~lampotila_sensorilta+1;
 		}
-		else 
+		else if(lampotila_sensorilta>0)
 		{
 			write_data('+');
 		}
@@ -86,6 +92,9 @@ int main()
 		write_string(buffer);
 		write_data(0b11011111); //aste-merkki
 		write_data('C');
+		
+		write_cmd(1<<7 | 18); // siirrytään positioon 1 toiselle riville
+		write_string(debug_buffer);
 		_delay_ms(1000);
 	}
 }
