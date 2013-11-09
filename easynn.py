@@ -1,4 +1,3 @@
-# -*- coding: iso-8859-15 -*-
 # Copyright (c) 2013 Pasi Heinonen, pasi.heinonen at gmail.com
 # Licensed under MIT License.
 
@@ -24,7 +23,7 @@
 #
 # Python NeuralNet, Easy NN
 #
-VERSION="0.1"
+VERSION="0.2"
 
 import random
 import cPickle as pickle
@@ -32,10 +31,10 @@ from math import exp
 
 
 class EasyNN():
-    def __init__(self, hidden_neurons, output_neurons,input_vector=[]):
+    def __init__(self, hidden_neurons, output_neurons,input_vector=[],bias=None):
         self.__momentum = 0
         self.__x = list(input_vector)
-        self.__x.append(1)
+        if bias!=None: self.__x.append(1)
         self.__hidden_neurons=hidden_neurons
         self.__output_neurons=output_neurons
         self.__Y = [0 for j in xrange(self.__hidden_neurons)]
@@ -67,12 +66,12 @@ class EasyNN():
         for j in xrange(len(self.__w)):
             sum = 0
             for i in xrange(len(self.__w[0])):
-                self.__w[j][i] = random.uniform(-0.0005, 0.0005)
+                self.__w[j][i] = random.uniform(-0.00005, 0.00005)
 
         for j in xrange(len(self.__v)):
             sum = 0
             for i in xrange(len(self.__v[0])):
-                self.__v[j][i] = random.uniform(-0.0005, 0.0005)
+                self.__v[j][i] = random.uniform(-0.5, 0.5)
 
     def __netError(self):
         """
@@ -114,12 +113,13 @@ class EasyNN():
                 self.__v[j][i] = self.__v[j][i] + delta * self.__d_minus_o * self.__n
                 prev_delta = delta
 
-    def Load(self,net_path,input_vector=[]):
+    def Load(self,net_path,input_vector=[], bias=None):
         """
         Loads input to the net
         """
         self.__x = list(input_vector)
-        self.__w, self.__v, self.__Y =pickle.load( open( net_path, "rb" ) )
+        if bias!=None: self.__x.append(bias)
+        self.__w, self.__v, self.__Y=pickle.load( open( net_path, "rb" ) )
         self.__init_net()
         return self.__o[0]
 
@@ -177,15 +177,19 @@ class EasyNN():
 
             if epoch_count % 2==0:
                 self.__x = list(train_set["train.1"]["input"])
-                self.__x.append(1)
+                #self.__x.append(1)
                 self.__d = train_set["train.1"]["expect"]
-                if ((self.__d  - self.__o[0]) < min_error): positive = True
+                if ((self.__d  - self.__o[0]) < min_error):
+                    positive = True
+                    print "positive True:",self.__d  - self.__o[0]
             else:
                 self.__x = list(train_set["train.2"]["input"])
-                self.__x.append(-1)
+                #self.__x.append(1)
                 self.__d = train_set["train.2"]["expect"]
-                if ((self.__o[0] - self.__d) < min_error): negative = True
-            if(positive and negative): loop=False
+                if ((self.__o[0] - self.__d) < min_error):
+                    negative = True
+                    print "negative True:",self.__o[0] - self.__d
+            if(positive==True and negative==True): loop=False
 
             for j in self.__x:
                 self.__d_minus_o = self.__netError()
