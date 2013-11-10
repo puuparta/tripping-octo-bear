@@ -23,7 +23,7 @@
 #
 # Python NeuralNet, Easy NN
 #
-VERSION="0.2"
+VERSION="0.3"
 
 import random
 import cPickle as pickle
@@ -42,6 +42,9 @@ class EasyNN():
         self.__d_minus_o = None
         self.__w = [[0 for j in xrange(len(self.__x))] for i in xrange(self.__hidden_neurons)]
         self.__v = [[0 for j in xrange(self.__hidden_neurons)] for i in xrange(self.__output_neurons)]
+        self.__deltar_w = [[0 for j in xrange(len(self.__x))] for i in xrange(self.__hidden_neurons)]
+        self.__deltar_v = [[0 for j in xrange(self.__hidden_neurons)] for i in xrange(self.__output_neurons)]
+        self.__epoch_count=0
 
     def __init_net(self):
         """
@@ -96,22 +99,20 @@ class EasyNN():
         """
         Weight matrices recalculation during training, DeltaW and DeltaV
         """
-        prev_delta = 0
         for j in xrange(len(self.__Y)):
             for i in xrange(len(self.__x)):
                 sigmoid_slopeo = self.__o[0] * (1 - self.__o[0])
                 sigmoid_slopeh = self.__Y[j] * (1 - self.__Y[j])
-                delta = self.__x[i] * sigmoid_slopeh * self.__v[0][j] * sigmoid_slopeo
-                self.__w[j][i] = self.__w[j][i] + delta * self.__d_minus_o * self.__n + self.__momentum * prev_delta
-                prev_delta = delta
+                delta = self.__x[i] * sigmoid_slopeh * self.__v[0][j] * sigmoid_slopeo * self.__d_minus_o * self.__n + self.__momentum * self.__deltar_w[self.__epoch_count-1][j][i]
+                self.__w[j][i] = self.__w[j][i] + delta
+                self.__deltar_w[self.__epoch_count-1][j][i]=delta
 
-        prev_delta = 0
         for j in xrange(len(self.__o)):
             for i in xrange(len(self.__Y)):
                 sigmoid_slopeo = self.__o[0] * (1 - self.__o[0])
-                delta = self.__Y[i] * sigmoid_slopeo + self.__momentum * prev_delta
-                self.__v[j][i] = self.__v[j][i] + delta * self.__d_minus_o * self.__n
-                prev_delta = delta
+                delta = self.__Y[i] * sigmoid_slopeo * self.__d_minus_o * self.__n + self.__momentum * self.__deltar_v[self.__epoch_count-1][j][i]
+                self.__v[j][i] = self.__v[j][i] + delta
+                self.__deltar_v[self.__epoch_count-1][j][i]=delta
 
     def Load(self,net_path,input_vector=[], bias=None):
         """
@@ -128,13 +129,14 @@ class EasyNN():
         Backpropagation training with given input vector and expected output value
         """
         loop = True
-        epoch_count = 0
+        self.__epoch_count = 0
         self.__d = expect
         self.__E_W = 0
         self.__d_minus_o = 0
         self.__n = learning_rate
         self.__momentum=momentum
-
+        self.__deltar_w = [[[0 for j in xrange(len(self.__x))] for i in xrange(self.__hidden_neurons)]for i in xrange(max_epochs)]
+        self.__deltar_v = [[[0 for j in xrange(self.__hidden_neurons)] for i in xrange(self.__output_neurons)]for i in xrange(max_epochs)]
         if input_vector!=None:
             self.__x=list(input_vector)
             self.__x.append(1)
@@ -143,15 +145,15 @@ class EasyNN():
         self.__init_weights()
 
         while loop:
-            epoch_count = epoch_count + 1
+            self.__epoch_count  = self.__epoch_count  + 1
             self.__E_W = 0
             for j in self.__x:
                 self.__d_minus_o = self.__netError()
                 self.__E_W =self.__E_W + pow(self.__d_minus_o, 2)
                 self.__netNewWeights()
             if (self.__d_minus_o < min_error): loop = False
-            if(epoch_count>=max_epochs): loop = False
-        return self.__o, self.__d_minus_o, epoch_count
+            if(self.__epoch_count >=max_epochs): loop = False
+        return self.__o, self.__d_minus_o, self.__epoch_count
 
     def MultiTrain(self, min_error=0.09, max_epochs=10000, learning_rate=0.05, momentum=0.3, train_set=None):
         """
@@ -160,22 +162,24 @@ class EasyNN():
         if train_set==None: pass
         if len(train_set) != 2: pass
         loop = True
-        epoch_count = 0
+        self.__epoch_count  = 0
         self.__E_W = 0
         self.__E_W_set = [0,0]
         self.__d_minus_o = 0
         self.__n = learning_rate
         self.__momentum=momentum
+        self.__deltar_w = [[[0 for j in xrange(len(self.__x))] for i in xrange(self.__hidden_neurons)]for i in xrange(max_epochs)]
+        self.__deltar_v = [[[0 for j in xrange(self.__hidden_neurons)] for i in xrange(self.__output_neurons)]for i in xrange(max_epochs)]
         self.__init_net()
         self.__init_weights()
         positive=False
         negative=False
 
         while loop:
-            epoch_count = epoch_count + 1
+            self.__epoch_count  = self.__epoch_count  + 1
             self.__E_W = 0
 
-            if epoch_count % 2==0:
+            if self.__epoch_count  % 2==0:
                 self.__x = list(train_set["train.1"]["input"])
                 #self.__x.append(1)
                 self.__d = train_set["train.1"]["expect"]
@@ -195,14 +199,14 @@ class EasyNN():
                 self.__d_minus_o = self.__netError()
                 self.__E_W =self.__E_W + pow(self.__d_minus_o, 2)
                 self.__netNewWeights()
-                if epoch_count % 2==0:
+                if self.__epoch_count  % 2==0:
                     self.__E_W_set[0]=self.__E_W
                 else:
                     self.__E_W_set[1]=self.__E_W
 
             if (self.__E_W_set[0] < min_error and self.__E_W_set[1] < min_error): loop = False
-            if (epoch_count>=max_epochs): loop = False
-        return self.__o, (self.__o[0] - self.__d), (self.__d  - self.__o[0]), epoch_count
+            if (self.__epoch_count >=max_epochs): loop = False
+        return self.__o, (self.__o[0] - self.__d), (self.__d  - self.__o[0]), self.__epoch_count
 
     def Save(self, net_path, input_path=None):
         """

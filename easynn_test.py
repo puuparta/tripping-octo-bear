@@ -6,7 +6,7 @@ from easynn import EasyNN,VERSION
 
 def save(input_vector,path):
     nn = EasyNN(4,1,input_vector,bias=1)
-    ret = nn.Train(0.1,100000,0.0005, 0.09, 1,input_vector) #0.000005, 0.3
+    ret = nn.Train(0.1,100000,0.005, 0.9, 1,input_vector) #0.000005, 0.3
     nn.Save(path)
     return ret
 
@@ -45,7 +45,7 @@ set = {
 
 input = [1,2,3,4,5,6,7,8,7,6,5,4,3,2,1]
 nn = EasyNN(4,1,input, bias=None)
-print nn.MultiTrain(0.22,100000,0.005, 0, set)
+print nn.MultiTrain(0.22,100000,0.005, 0.9, set)
 nn.Save(r'c:\pynn.bin')
 
 input = [1,2,3,4,5,6,7,8,7,6,5,4,3,2,1]
